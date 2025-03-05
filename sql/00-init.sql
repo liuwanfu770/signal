@@ -13,33 +13,30 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    email VARCHAR(100) UNIQUE,
-    role user_role DEFAULT 'user',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    role VARCHAR(20) DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Signal 账号表
-CREATE TABLE signal_accounts (
+CREATE TABLE IF NOT EXISTS signal_accounts (
     phone_number VARCHAR(20) PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    user_id INTEGER,
     instance_id INTEGER,
     status VARCHAR(20) DEFAULT 'REGISTERED',
-    last_seen TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 消息表
 CREATE TABLE messages (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    sender_id VARCHAR(20) REFERENCES signal_accounts(phone_number),
-    recipient_id VARCHAR(20) REFERENCES signal_accounts(phone_number),
-    group_id VARCHAR(50) REFERENCES groups(id),
-    content TEXT NOT NULL,
-    type VARCHAR(20) NOT NULL CHECK (type IN ('TEXT', 'IMAGE', 'VIDEO', 'FILE')),
-    status VARCHAR(20) DEFAULT 'SENDING' CHECK (status IN ('SENDING', 'SENT', 'DELIVERED', 'READ')),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id SERIAL PRIMARY KEY,
+  sender_id VARCHAR(20) NOT NULL,
+  recipient_id VARCHAR(20),          -- NULL for group messages
+  group_id VARCHAR(50),             -- NULL for individual messages
+  content TEXT NOT NULL,
+  type VARCHAR(10) NOT NULL CHECK (type IN ('TEXT', 'IMAGE', 'VIDEO', 'FILE')),
+  status VARCHAR(10) NOT NULL CHECK (status IN ('SENDING', 'SENT', 'FAILED', 'RECEIVED')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 群组表
@@ -63,7 +60,7 @@ CREATE TABLE group_members (
 );
 
 -- 联系人表
-CREATE TABLE contacts (
+CREATE TABLE IF NOT EXISTS contacts (
     user_id VARCHAR(20) REFERENCES signal_accounts(phone_number),
     contact_id VARCHAR(20) REFERENCES signal_accounts(phone_number),
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -71,10 +68,11 @@ CREATE TABLE contacts (
 );
 
 -- 搜索历史表
-CREATE TABLE search_history (
+CREATE TABLE IF NOT EXISTS search_history (
     search_id SERIAL PRIMARY KEY,
     phone_number VARCHAR(20) REFERENCES signal_accounts(phone_number),
-    search_query VARCHAR(255),
+    search_query VARCHAR(255) NOT NULL,
+    search_type VARCHAR(20) NOT NULL CHECK (search_type IN ('CONTACT', 'GROUP', 'MESSAGE')),
     search_results JSONB,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -84,6 +82,8 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_signal_accounts_user_id ON signal_accounts(user_id);
 CREATE INDEX idx_group_members_group ON group_members(group_id);
 CREATE INDEX idx_group_members_user ON group_members(user_id);
-CREATE INDEX idx_messages_sender_id ON messages(sender_id);
-CREATE INDEX idx_messages_recipient_id ON messages(recipient_id);
-CREATE INDEX idx_messages_group_id ON messages(group_id);
+CREATE INDEX idx_messages_sender ON messages(sender_id);
+CREATE INDEX idx_messages_recipient ON messages(recipient_id);
+CREATE INDEX idx_messages_group ON messages(group_id);
+CREATE INDEX IF NOT EXISTS idx_search_history_phone_number ON search_history(phone_number);
+CREATE INDEX IF NOT EXISTS idx_search_history_timestamp ON search_history(timestamp);

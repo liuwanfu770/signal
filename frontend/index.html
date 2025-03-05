@@ -11,6 +11,12 @@
         button { padding: 5px 10px; }
         #messages { border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; }
         .message { border-bottom: 1px solid #eee; padding: 5px; }
+        .container { max-width: 600px; margin: 20px auto; font-family: Arial, sans-serif; }
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; }
+        button { padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #contact-list { list-style-type: none; padding: 0; }
+        #search-results, #history-list { list-style-type: none; padding: 0; }
     </style>
 </head>
 <body>
@@ -29,19 +35,22 @@
         <div id="messages"></div>
     </div>
 
-    <div>
+    <div class="container">
         <h2>Send Message</h2>
-        <select id="sender-phone">
-            <!-- Populate dynamically via API -->
+        <select id="sender-phone" required>
+            <option value="">Select Sender</option>
             <option value="+1234567890">+1234567890</option>
+            <!-- Populate dynamically via API in production -->
         </select>
-        <input type="text" id="recipient" placeholder="Recipient Phone or Group ID">
-        <input type="email" id="recipient-email" placeholder="Recipient Email">
-        <textarea id="message" placeholder="Message"></textarea>
-        <button onclick="sendMessage()">Send</button>
+        <input type="text" id="recipient" placeholder="Recipient Phone (optional)">
+        <input type="text" id="group-id" placeholder="Group ID (optional)">
+        <textarea id="message" placeholder="Enter your message" required></textarea>
+        <button onclick="sendMessage()">Send Message</button>
         <div id="send-status"></div>
+
+        <h3>Incoming Messages</h3>
+        <div id="messages"></div>
     </div>
-    <ul id="messages"></ul>
 
     <div>
         <h2>创建群组</h2>
@@ -222,20 +231,52 @@
         async function sendMessage() {
             const senderPhone = document.getElementById('sender-phone').value;
             const recipient = document.getElementById('recipient').value;
-            const recipientEmail = document.getElementById('recipient-email').value;
+            const groupId = document.getElementById('group-id').value;
             const content = document.getElementById('message').value;
+
+            if (!senderPhone || !content || (!recipient && !groupId)) {
+                document.getElementById('send-status').innerText = 'Please fill all required fields.';
+                return;
+            }
+
             try {
-                const response = await fetch('http://your-backend-domain.com/v1/messages', {
+                const response = await fetch('http://localhost:3000/v1/messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sender_phone: senderPhone, recipient, recipient_email: recipientEmail, content, type: 'TEXT' })
+                    body: JSON.stringify({
+                        sender_phone: senderPhone,
+                        recipient: recipient || undefined,
+                        group_id: groupId || undefined,
+                        content,
+                        type: 'TEXT',
+                    }),
                 });
                 const data = await response.json();
-                document.getElementById('send-status').innerText = `Message sent: ID ${data.id}`;
+                if (response.ok) {
+                    document.getElementById('send-status').innerText = `Message sent successfully. ID: ${data.id}`;
+                } else {
+                    document.getElementById('send-status').innerText = `Error: ${data.error}`;
+                }
             } catch (error) {
                 document.getElementById('send-status').innerText = `Error: ${error.message}`;
             }
         }
+
+        const ws = new WebSocket('ws://localhost:8081');
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'new_message') {
+                const msg = data.data;
+                const messageDiv = document.getElementById('messages');
+                messageDiv.innerHTML += `<p><strong>${msg.sender}</strong> → ${msg.recipient}：${msg.content}</p>`;
+                messageDiv.scrollTop = messageDiv.scrollHeight;
+            }
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
 
         async function createGroup() {
             const creatorPhone = document.getElementById('creator-phone').value;
@@ -280,7 +321,8 @@
                     body: JSON.stringify({ phone_number: phoneNumber })
                 });
                 const data = await response.json();
-                document.getElementById('sync-status').innerText = `${data.message}，同步 ${data.count} 个联系人`;
+                document.getElementById('sync-status').innerText =
+                    data.error ? data.error : `${data.message}，同步 ${data.count} 个联系人`;
             } catch (error) {
                 document.getElementById('sync-status').innerText = `错误: ${error.message}`;
             }
@@ -296,7 +338,7 @@
                     body: JSON.stringify({ phone_number: phoneNumber, contact_phone: contactPhone })
                 });
                 const data = await response.json();
-                document.getElementById('add-status').innerText = data.message;
+                document.getElementById('add-status').innerText = data.error ? data.error : data.message;
             } catch (error) {
                 document.getElementById('add-status').innerText = `错误: ${error.message}`;
             }
@@ -309,11 +351,17 @@
                 const data = await response.json();
                 const contactList = document.getElementById('contact-list');
                 contactList.innerHTML = '';
-                data.contacts.forEach(contact => {
-                    const li = document.createElement('li');
-                    li.textContent = `${contact.contact_id} (添加时间: ${new Date(contact.added_at).toLocaleString()})`;
-                    contactList.appendChild(li);
-                });
+                if (data.contacts && data.contacts.length > 0) {
+                    data.contacts.forEach(contact => {
+                        const li = document.createElement('li');
+                        li.textContent = `${contact.contact_id} (添加时间: ${
+                            new Date(contact.added_at).toLocaleString()
+                        })`;
+                        contactList.appendChild(li);
+                    });
+                } else {
+                    contactList.innerHTML = '<li>暂无联系人</li>';
+                }
             } catch (error) {
                 console.error('加载联系人错误:', error);
             }

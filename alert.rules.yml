@@ -1,0 +1,11 @@
+groups:
+- name: signal-alerts
+  rules:
+  - alert: HighCPUUsage
+    expr: cpu_usage_percent > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: 高 CPU 使用率检测到
+      description: CPU 使用率超过 80%，持续 5 分钟

@@ -3,13 +3,12 @@
 ## 1. 项目概述
 
 ### 1.1 项目基本信息
-
-| 项次 | 内容 |
-| --- | --- |
-| 项目名称 | Signal-CLI 多账号管理系统 |
-| 项目目标 | 构建一个稳定、安全、可扩展的系统，支持管理多个 Signal 账号，实现消息收发、群组管理、联系人管理等核心功能，提供友好的管理界面和用户界面，并支持容器化部署。 |
-| 目标用户 | - 管理员：负责账号注册、养号、续号、封控及系统监控。 <br> - 普通用户：使用分配的账号进行消息收发和日常聊天。 |
-| 预期规模 | 支持管理 5000 个 Signal 账号，具备动态扩展能力。 |
+- **项目名称**：Signal-CLI 多账号管理系统
+- **项目目标**：构建一个稳定、安全、可扩展的系统，支持管理多个 Signal 账号，实现消息收发、群组管理、联系人管理等功能，提供友好的管理界面和用户界面，并支持容器化部署。
+- **目标用户**：
+  - 管理员：负责账号注册、养号、续号、防封策略及系统监控。
+  - 普通用户：使用分配的账号进行消息收发和日常聊天。
+- **预期规模**：支持管理 5000 个 Signal 账号，具备动态扩展能力。
 
 ### 1.2 项目范围
 
@@ -363,3 +362,25 @@ CREATE INDEX idx_messages_group_id ON messages(group_id);
 CREATE INDEX idx_search_history_phone_number ON search_history(phone_number);
 CREATE INDEX idx_search_history_timestamp ON search_history(timestamp);
 ```
+
+## 6. API 设计
+
+### 6.1 API 风格
+- **风格**：RESTful
+- **数据格式**：JSON
+- **认证方式**：JWT (JSON Web Token)
+- **版本控制**：URL 中使用版本号，例如 /v1/register
+- **错误处理**：统一格式，包含错误码和错误信息。
+
+### 6.2 错误响应格式
+```json
+{
+    "error": {
+        "code": 400,
+        "message": "Invalid phone number"
+    }
+}
+```
+
+### 6.3 API 列表
+// ...API 列表内容...
