@@ -11,7 +11,15 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const WebSocket = require('ws');
+const client = require('prom-client'); // 新增
+const { loadConfig, getConfig } = require('./configService');
 require('dotenv').config();
+
+const { registerAccount, loginAccount, getAccountStatus, refreshTokenEndpoint } = require('./accounts');
+const { syncContacts, addContact, deleteContact, listContacts } = require('./contacts');
+const { handleSearch, getSearchHistory } = require('./search');
+const { createGroup, addMember, leaveGroup, removeMember, getUserGroups, getGroupMembers } = require('./groups');
+const { handleWebhook } = require('./webhook');
 
 const app = express();
 
@@ -19,17 +27,21 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(rateLimit);
 
+loadConfig();
+
 // 数据库连接池
 const pool = new Pool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: 5432
+    host: getConfig('db').host,
+    user: getConfig('db').user,
+    password: getConfig('db').password,
+    database: getConfig('db').database,
+    port: getConfig('db').port
 });
 
 // WebSocket server on port 8081
 const wss = new WebSocket.Server({ port: 8081 });
+
+client.collectDefaultMetrics();       // 新增
 
 // 注册账号 API
 app.post('/v1/register', async (req, res) => {
@@ -48,20 +60,18 @@ app.post('/v1/register', async (req, res) => {
     }
 });
 
-// 用户登录 API
-app.post('/v1/login', async (req, res) => {
-    const { username, password } = req.body;
-    try {
-        const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-        if (rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
-        const user = rows[0];
-        const match = await bcrypt.compare(password, user.password);
-        if (!match) return res.status(401).json({ error: 'Invalid credentials' });
-        const token = jwt.sign({ user_id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+// 用户登录 API（确保使用更新后的 loginAccount 实现）
+app.post('/v1/login', loginAccount);
+
+// 新增刷新 Token 接口
+app.post('/v1/accounts/refresh', refreshTokenEndpoint);
+
+// 示例：基于角色的接口（仅 admin 可调用）
+app.post('/v1/accounts/batch-create', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: '无权执行此操作' });
+  }
+  // ...existing batch-create 逻辑...
 });
 
 // Send message endpoint
@@ -125,39 +135,7 @@ app.post('/v1/messages', async (req, res) => {
 });
 
 // Webhook endpoint for receiving messages
-app.post('/v1/webhook', async (req, res) => {
-    const { account, envelope } = req.body;
-    const { source, dataMessage } = envelope || {};
-    const content = dataMessage?.message;
-
-    if (!account || !source || !content) {
-        return res.status(400).json({ error: 'Invalid webhook payload' });
-    }
-
-    try {
-        // Store received message
-        const insertQuery = `
-            INSERT INTO messages (sender_id, recipient_id, content, type, status)
-            VALUES ($1, $2, $3, 'TEXT', 'RECEIVED')
-        `;
-        await pool.query(insertQuery, [source, account, content]);
-
-        // Broadcast to WebSocket clients
-        wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    type: 'new_message',
-                    data: { sender: source, recipient: account, content },
-                }));
-            }
-        });
-
-        res.status(200).send('Webhook received');
-    } catch (error) {
-        console.error('Webhook error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
+app.post('/v1/webhook', handleWebhook);
 
 // 同步联系人
 app.post('/v1/contacts/sync', async (req, res) => {
@@ -404,6 +382,24 @@ app.get('/v1/search/history', async (req, res) => {
 // 使用 contacts 路由
 app.use('/v1/contacts', contactRoutes);
 
+// 联系人管理路由
+app.post('/v1/contacts/sync', authMiddleware, syncContacts);
+app.post('/v1/contacts', authMiddleware, addContact);
+app.delete('/v1/contacts', authMiddleware, deleteContact);
+app.get('/v1/contacts', authMiddleware, listContacts);
+
+// 添加搜索模块路由（通过 JWT 保护）
+app.get('/v1/search', authMiddleware, handleSearch);
+app.get('/v1/search/history', authMiddleware, getSearchHistory);
+
+// 群组管理路由
+app.post('/v1/groups', authMiddleware, createGroup);
+app.post('/v1/groups/members/add', authMiddleware, addMember);
+app.delete('/v1/groups/members/remove', authMiddleware, removeMember);
+app.post('/v1/groups/leave', authMiddleware, leaveGroup);
+app.get('/v1/groups', authMiddleware, getUserGroups);
+app.get('/v1/groups/:groupId/members', authMiddleware, getGroupMembers);
+
 // Log WebSocket connections
 wss.on('connection', (ws) => {
     console.log('New WebSocket client connected');
@@ -414,12 +410,15 @@ app.use('/v1/accounts', accountRoutes);
 app.use('/v1/messages', messageRoutes);
 app.use('/v1/instances', instanceRoutes);
 
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', client.register.contentType);
+  res.end(await client.register.metrics());
+});
+
 app.use((err, req, res, next) => {
     logger.error(err.stack);
     res.status(500).json({ error: '服务器错误' });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    logger.info(`服务器启动于端口 ${PORT}`);
-});
+const PORT = getConfig('server').port || process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Backend server running on port ${PORT}`));

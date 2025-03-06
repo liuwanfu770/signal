@@ -1,5 +1,10 @@
 version: '3.8'
 
+networks:
+  frontend-network:
+  backend-network:
+  db-network:
+
 services:
   backend:
     build:
@@ -7,42 +12,66 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./backend:/app
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
+      - backend_data:/app/data
     depends_on:
-      - db
-      - signal-api
+      db:
+        condition: service_healthy
+      signal-api:
+        condition: service_started
     environment:
       - NODE_ENV=production
       - DB_HOST=db
-      - DB_USER=signal_user
-      - DB_PASSWORD=SignalSecurePass2023
-      - DB_NAME=signal_db
+      - DB_USER=${DB_USER:-signal_user}
+      - DB_PASSWORD=${DB_PASSWORD:-SignalSecurePass2023}
+      - DB_NAME=${DB_NAME:-signal_db}
     command: node src/index.js
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+      - db-network
 
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: signal_user
-      POSTGRES_PASSWORD: SignalSecurePass2023
-      POSTGRES_DB: signal_db
+      POSTGRES_USER: ${DB_USER:-signal_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SignalSecurePass2023}
+      POSTGRES_DB: ${DB_NAME:-signal_db}
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-signal_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-network
 
   signal-api:
-    image: bbernhard/signal-cli-rest-api:0.20.0
+    image: bbernhard/signal-cli-rest-api:0.65
+    platform: ${SIGNAL_API_PLATFORM:-linux/arm64}
     ports:
       - "8080:8080"
     environment:
       - WEBHOOK_URL=http://backend:3000/v1/webhook
     volumes:
       - ./data/signal:/home/.local/share/signal-cli
-    restart: always
+    restart: unless-stopped
+    networks:
+      - backend-network
 
 volumes:
-  signal-data:
+  backend_logs:
+  backend_uploads:
+  backend_data:
+  frontend_data:
   postgres-data:
-

@@ -1,0 +1,22 @@
+{
+  "env": "dev",
+  "server": {
+    "port": 3001
+  },
+  "db": {
+    "host": "localhost",
+    "user": "your_db_user",
+    "password": "your_db_password",
+    "database": "signal_db",
+    "port": 5432
+  },
+  "signal": {
+    "cliUrl": "http://localhost:8080"
+  },
+  "jwt": {
+    "secret": "ChangeThisSecret",
+    "expiresIn": "2h",
+    "refreshSecret": "AnotherSecret",
+    "refreshExpiresIn": "7d"
+  }
+}

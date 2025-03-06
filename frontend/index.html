@@ -126,6 +126,130 @@
         <div id="messages"></div>
     </div>
 
+    <div>
+        <h2>Register</h2>
+        <input id="reg_phone" placeholder="Phone Number">
+        <input id="reg_pass" type="password" placeholder="Password">
+        <button onclick="register()">Register</button>
+    </div>
+
+    <div>
+        <h2>Login</h2>
+        <input id="login_phone" placeholder="Phone Number">
+        <input id="login_pass" type="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <div>
+        <button onclick="getStatus()">Get Account Status</button>
+        <pre id="output"></pre>
+    </div>
+
+    <div>
+        <h2>Send Message</h2>
+        <input id="msg_recipient" placeholder="Recipient Phone">
+        <input id="msg_content" placeholder="Message">
+        <button onclick="sendMsg()">Send</button>
+    </div>
+
+    <div>
+        <h2>Sync Contacts</h2>
+        <button onclick="syncContacts()">同步联系人</button>
+        <div id="syncStatus"></div>
+    </div>
+
+    <div>
+        <h2>Add Contact</h2>
+        <input id="contact_phone" placeholder="Contact Phone">
+        <button onclick="addContact()">添加联系人</button>
+        <div id="addStatus"></div>
+    </div>
+
+    <div>
+        <h2>Delete Contact</h2>
+        <input id="del_contact_phone" placeholder="Contact Phone">
+        <button onclick="deleteContact()">删除联系人</button>
+        <div id="delStatus"></div>
+    </div>
+
+    <div>
+        <h2>List Contacts</h2>
+        <button onclick="listContacts()">查看联系人</button>
+        <ul id="contactList"></ul>
+    </div>
+
+    <!-- 新增：联系人管理测试区域 -->
+    <div class="section">
+        <h2>同步联系人</h2>
+        <button onclick="syncContacts()">同步联系人</button>
+        <div id="syncStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>添加联系人</h2>
+        <input id="contact_phone" placeholder="联系人电话">
+        <button onclick="addContact()">添加联系人</button>
+        <div id="addStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>删除联系人</h2>
+        <input id="del_contact_phone" placeholder="联系人电话">
+        <button onclick="deleteContact()">删除联系人</button>
+        <div id="delStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>查看联系人列表</h2>
+        <button onclick="listContacts()">加载联系人</button>
+        <ul id="contactList"></ul>
+    </div>
+
+    <!-- 新增：搜索模块测试区域 -->
+    <div class="section">
+        <h2>Search</h2>
+        <select id="searchType">
+            <option value="CONTACT">CONTACT</option>
+            <option value="GROUP">GROUP</option>
+            <option value="MESSAGE">MESSAGE</option>
+        </select>
+        <input id="searchQuery" placeholder="Search query">
+        <button onclick="doSearch()">Search</button>
+    </div>
+
+    <div class="section">
+        <h3>Results</h3>
+        <ul id="searchResults"></ul>
+    </div>
+
+    <div class="section">
+        <h3>Search History</h3>
+        <button onclick="viewSearchHistory()">View History</button>
+        <ul id="searchHistory"></ul>
+    </div>
+
+    <!-- 新增：群组管理测试区域 -->
+    <div class="section">
+        <h2>Create Group</h2>
+        <input id="group_name" placeholder="Group Name">
+        <input id="group_members" placeholder="Initial members, comma separated">
+        <button onclick="createGroup()">Create Group</button>
+        <div id="groupCreateResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>My Groups</h2>
+        <button onclick="listMyGroups()">List My Groups</button>
+        <ul id="myGroups"></ul>
+    </div>
+
+    <div class="section">
+        <h2>Add Member to Group</h2>
+        <input id="group_id_add" placeholder="Group ID (signal-cli 格式)">
+        <input id="member_phone" placeholder="Member Phone">
+        <button onclick="addMember()">Add Member</button>
+    </div>
+
     <script>
         let token = null;   // 存储登录返回的 JWT Token
         const messages = {}; // 用于存储所有消息数据
@@ -408,6 +532,245 @@
                 });
             } catch (error) {
                 console.error('加载历史错误:', error);
+            }
+        }
+
+        async function register() {
+            const phone = document.getElementById('reg_phone').value;
+            const pass = document.getElementById('reg_pass').value;
+            const res = await fetch('http://localhost:3000/v1/accounts/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone_number: phone, password: pass })
+            });
+            const data = await res.json();
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function login() {
+            const phone = document.getElementById('login_phone').value;
+            const pass = document.getElementById('login_pass').value;
+            const res = await fetch('http://localhost:3000/v1/accounts/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone_number: phone, password: pass })
+            });
+            const data = await res.json();
+            token = data.token || '';
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function getStatus() {
+            const res = await fetch('http://localhost:3000/v1/accounts/status', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function sendMsg() {
+            const recipient_phone = document.getElementById('msg_recipient').value;
+            const content = document.getElementById('msg_content').value;
+            const res = await fetch('http://localhost:3000/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ recipient_phone, content })
+            });
+            const data = await res.json();
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function syncContacts() {
+            try {
+                const res = await fetch('http://localhost:3000/v1/contacts/sync', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                const data = await res.json();
+                document.getElementById('syncStatus').textContent = data.message || data.error;
+            } catch (err) {
+                console.error('syncContacts error:', err);
+            }
+        }
+
+        async function addContact() {
+            const phone = document.getElementById('contact_phone').value;
+            try {
+                const res = await fetch('http://localhost:3000/v1/contacts', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ contact_phone: phone })
+                });
+                const data = await res.json();
+                document.getElementById('addStatus').textContent = data.message || data.error;
+            } catch (err) {
+                console.error('addContact error:', err);
+            }
+        }
+
+        async function deleteContact() {
+            const phone = document.getElementById('del_contact_phone').value;
+            try {
+                const res = await fetch('http://localhost:3000/v1/contacts', {
+                    method: 'DELETE',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ contact_phone: phone })
+                });
+                const data = await res.json();
+                document.getElementById('delStatus').textContent = data.message || data.error;
+            } catch (err) {
+                console.error('deleteContact error:', err);
+            }
+        }
+
+        async function listContacts() {
+            try {
+                const res = await fetch('http://localhost:3000/v1/contacts', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                const ul = document.getElementById('contactList');
+                ul.innerHTML = '';
+                if (data.contacts && data.contacts.length > 0) {
+                    data.contacts.forEach(c => {
+                        const li = document.createElement('li');
+                        li.textContent = c.contact_phone + ' (' + c.added_at + ')';
+                        ul.appendChild(li);
+                    });
+                } else {
+                    ul.innerHTML = '<li>暂无联系人</li>';
+                }
+            } catch (err) {
+                console.error('listContacts error:', err);
+            }
+        }
+
+        async function doSearch() {
+            const type = document.getElementById('searchType').value;
+            const query = document.getElementById('searchQuery').value;
+            // 若后端已从 JWT 中获取 phone_number，则无需前端传；此处为示例
+            const phone_number = '你的电话号码'; // 请根据实际情况替换或从 token 中解析
+            try {
+                const res = await fetch(`http://localhost:3000/v1/search?type=${type}&query=${encodeURIComponent(query)}&phone_number=${phone_number}`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                const ul = document.getElementById('searchResults');
+                ul.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(r => {
+                        const li = document.createElement('li');
+                        if (type === 'CONTACT') {
+                            li.textContent = `Contact: ${r.contact_phone}, added_at: ${r.added_at}`;
+                        } else if (type === 'GROUP') {
+                            li.textContent = `Group: ${r.name} (ID: ${r.group_id}), joined_at: ${r.joined_at}`;
+                        } else if (type === 'MESSAGE') {
+                            li.textContent = `Msg: ${r.content} (timestamp: ${r.timestamp}, status: ${r.status})`;
+                        }
+                        ul.appendChild(li);
+                    });
+                } else {
+                    ul.innerHTML = '<li>No results found</li>';
+                }
+            } catch (err) {
+                console.error('Search error:', err);
+            }
+        }
+
+        async function viewSearchHistory() {
+            // 同样，phone_number 可从 JWT 获取
+            const phone_number = '你的电话号码';
+            try {
+                const res = await fetch(`http://localhost:3000/v1/search/history?phone_number=${phone_number}`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                const ul = document.getElementById('searchHistory');
+                ul.innerHTML = '';
+                if (data.history && data.history.length > 0) {
+                    data.history.forEach(h => {
+                        const li = document.createElement('li');
+                        li.textContent = `(${h.search_type}) "${h.search_query}" at ${h.timestamp}`;
+                        ul.appendChild(li);
+                    });
+                } else {
+                    ul.innerHTML = '<li>No history</li>';
+                }
+            } catch (err) {
+                console.error('viewSearchHistory error:', err);
+            }
+        }
+
+        async function createGroup() {
+            const group_name = document.getElementById('group_name').value;
+            const membersStr = document.getElementById('group_members').value;
+            const members = membersStr.split(',').map(m => m.trim()).filter(x => x);
+            try {
+                const res = await fetch('http://localhost:3000/v1/groups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ group_name, members })
+                });
+                const data = await res.json();
+                document.getElementById('groupCreateResult').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                console.error('createGroup error:', err);
+            }
+        }
+
+        async function listMyGroups() {
+            try {
+                const res = await fetch('http://localhost:3000/v1/groups', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                const ul = document.getElementById('myGroups');
+                ul.innerHTML = '';
+                if (data.groups && data.groups.length > 0) {
+                    data.groups.forEach(g => {
+                        const li = document.createElement('li');
+                        li.textContent = `${g.group_id} - ${g.name} [role=${g.role}], joined_at: ${g.joined_at}`;
+                        ul.appendChild(li);
+                    });
+                } else {
+                    ul.innerHTML = '<li>No groups found</li>';
+                }
+            } catch (err) {
+                console.error('listMyGroups error:', err);
+            }
+        }
+
+        async function addMember() {
+            const group_id = document.getElementById('group_id_add').value;
+            const member_phone = document.getElementById('member_phone').value;
+            try {
+                const res = await fetch('http://localhost:3000/v1/groups/members/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ group_id, member_phone })
+                });
+                const data = await res.json();
+                alert(JSON.stringify(data));
+            } catch (err) {
+                console.error('addMember error:', err);
             }
         }
     </script>

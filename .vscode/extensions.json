@@ -5,6 +5,7 @@
         "github.copilot-chat",
         "github.vscode-pull-request-github",
         "golang.go",
-        "github.copilot"
+        "github.copilot",
+        "openai.openai-chatgpt-adhoc"
     ]
 }
