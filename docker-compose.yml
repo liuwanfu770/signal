@@ -1,55 +1,62 @@
-version: '3.8'
-
 networks:
-  frontend-network:
   backend-network:
   db-network:
+  signal-network:
+    name: signal-network
 
 services:
   backend:
     build:
       context: ./backend
+      # 如果有单独的 Dockerfile，可通过:
+      # dockerfile: DockerfileBackend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${PORT}:${PORT}"
     volumes:
       - backend_logs:/app/logs
       - backend_uploads:/app/uploads
       - backend_data:/app/data
     depends_on:
-      db:
-        condition: service_healthy
-      signal-api:
-        condition: service_started
+      - db
+      - signal-api
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=production
-      - DB_HOST=db
-      - DB_USER=${DB_USER:-signal_user}
-      - DB_PASSWORD=${DB_PASSWORD:-SignalSecurePass2023}
-      - DB_NAME=${DB_NAME:-signal_db}
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      SIGNAL_CLI_URL: ${SIGNAL_CLI_URL}
+      JWT_SECRET: ${JWT_SECRET}
     command: node src/index.js
-    restart: unless-stopped
+    restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT}/health"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - backend-network
       - db-network
+      - signal-network
 
   db:
     image: postgres:16-alpine
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: ${DB_USER:-signal_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-SignalSecurePass2023}
-      POSTGRES_DB: ${DB_NAME:-signal_db}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    restart: unless-stopped
+    restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-signal_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,21 +64,35 @@ services:
       - db-network
 
   signal-api:
-    image: bbernhard/signal-cli-rest-api:0.65
-    platform: ${SIGNAL_API_PLATFORM:-linux/arm64}
+    # 在项目根目录使用自定义 Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
-      - WEBHOOK_URL=http://backend:3000/v1/webhook
+      MODE: native
+      SIGNAL_CLI_REST_API_PORT: 8080
+      AUTO_RECEIVE_SCHEDULE: "*/5 * * * *"
+      WEBHOOK_URL: "http://backend:4000/v1/webhook"
     volumes:
-      - ./data/signal:/home/.local/share/signal-cli
-    restart: unless-stopped
+      - signal-data:/home/.local/share/signal-cli
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     networks:
-      - backend-network
+      - signal-network
 
 volumes:
   backend_logs:
   backend_uploads:
   backend_data:
-  frontend_data:
   postgres-data:
+  signal-data:
+    name: signal-data

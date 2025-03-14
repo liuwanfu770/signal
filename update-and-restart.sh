@@ -1,4 +1,5 @@
 #!/bin/bash
+source /Users/bc/signal-project/.env
 
 # 进入项目目录
 cd /Users/bc/signal-project/backend

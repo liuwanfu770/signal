@@ -4,11 +4,8 @@ FROM node:18-alpine
 # 设置工作目录
 WORKDIR /app
 
-# 安装 `shadow`，以支持 `groupadd` 和 `useradd`
-RUN apk add --no-cache shadow
-
-# 创建非 root 用户
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# 创建非 root 用户 (使用Alpine兼容的命令)
+RUN addgroup -S appuser && adduser -S -G appuser appuser
 
 # 复制 package.json 和 package-lock.json
 COPY package*.json ./

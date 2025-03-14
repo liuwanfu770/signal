@@ -14,7 +14,8 @@ scrape_configs:
 
   - job_name: 'signal-api'
     static_configs:
-      - targets: ['signal-api-1:8080', 'signal-api-2:8081']
+      - targets: ['signal-api:8080']
+
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']

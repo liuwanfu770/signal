@@ -5,7 +5,10 @@
         "github.copilot-chat",
         "github.vscode-pull-request-github",
         "golang.go",
+        "openai.openai-chatgpt-adhoc",
+        "github.codespaces",
         "github.copilot",
-        "openai.openai-chatgpt-adhoc"
+        "openai.chatgpt",
+        "ritwickdey.liveserver"
     ]
 }
